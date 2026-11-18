@@ -2,6 +2,8 @@
 
 3-Chess is a three-player chess engine and interactive light-theme web application for **White**, **Red**, and **Black** played on a **96-cell three-sector hexagonal-perimeter board**.
 
+![3-Chess 96-Cell Three-Player Web Interface](docs/screenshot.png)
+
 ## Game Rules and Topology
 
 - **Board Geometry:** A regular outer hexagon partitioned into three 8x4 quadrilateral sectors (32 squares per sector, 96 cells total) converging at a 6-cell central rosette.

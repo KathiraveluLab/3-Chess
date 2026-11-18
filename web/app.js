@@ -77,6 +77,7 @@
 
     const cx = (c00.x + c10.x + c11.x + c01.x) / 4;
     const cy = (c00.y + c10.y + c11.y + c01.y) / 4;
+    const outerMid = midpoint(c00, c10);
     const parity = (rank + file) & 1;
 
     CELL_GEOM.push({
@@ -87,6 +88,7 @@
       parity,
       cx,
       cy,
+      outerMid,
       points: `${c00.x.toFixed(2)},${c00.y.toFixed(2)} ${c10.x.toFixed(2)},${c10.y.toFixed(2)} ${c11.x.toFixed(2)},${c11.y.toFixed(2)} ${c01.x.toFixed(2)},${c01.y.toFixed(2)}`
     });
   }
@@ -296,307 +298,313 @@
       }
     }
 
-    // Draw sector labels along the three back edges
-    const sectorLabels = [
-      { text: "WHITE SECTOR (a1 - h1)", pos: midpoint(V1, V0), dx: 0, dy: 34, color: "#0f172a" },
-      { text: "RED SECTOR (a1 - h1)", pos: midpoint(V3, V2), dx: -32, dy: -22, color: "#b91c1c" },
-      { text: "BLACK SECTOR (a1 - h1)", pos: midpoint(V5, V4), dx: 32, dy: -22, color: "#0f172a" }
+    const sectorOutward = [
+      { text: "WHITE SECTOR (a1 - h1)", base: B_W, nx: 0, ny: 1, rot: 0, color: "#0f172a" },
+      { text: "RED SECTOR (a1 - h1)", base: B_R, nx: -Math.sqrt(3) / 2, ny: -0.5, rot: -60, color: "#b91c1c" },
+      { text: "BLACK SECTOR (a1 - h1)", base: B_B, nx: Math.sqrt(3) / 2, ny: -0.5, rot: 60, color: "#0f172a" }
     ];
-    for (const lbl of sectorLabels) {
-      const t = document.createElementNS(SVG_NS, "text");
-      t.setAttribute("x", lbl.pos.x + lbl.dx);
-      t.setAttribute("y", lbl.pos.y + lbl.dy);
-      t.setAttribute("text-anchor", "middle");
-      t.setAttribute("font-size", "13");
-      t.setAttribute("font-weight", "700");
-      t.setAttribute("fill", lbl.color);
-      t.textContent = lbl.text;
-      boardSvg.appendChild(t);
-    }
 
-    // Draw file letters (a..h) along each sector's outer rank 0
-    for (let s = 0; s < 3; s++) {
-      for (let f = 0; f < 8; f++) {
-        const cell = s * 32 + f;
-        const g = CELL_GEOM[cell];
-        const vx = g.cx - CX;
-        const vy = g.cy - CY;
-        const mag = Math.hypot(vx, vy) || 1;
-        const lx = g.cx + (vx / mag) * 23;
-        const ly = g.cy + (vy / mag) * 23 + 4;
-        const txt = document.createElementNS(SVG_NS, "text");
-        txt.setAttribute("x", lx);
-        txt.setAttribute("y", ly);
-        txt.setAttribute("text-anchor", "middle");
-        txt.setAttribute("font-size", "11");
-        txt.setAttribute("font-weight", "600");
-        txt.setAttribute("fill", "#475569");
-        txt.textContent = FILES[f];
-        boardSvg.appendChild(txt);
+      // Draw sector labels parallel and cleanly outside the three back edges
+      for (const lbl of sectorOutward) {
+        const lx = lbl.base.x + lbl.nx * 38;
+        const ly = lbl.base.y + lbl.ny * 38;
+        const t = document.createElementNS(SVG_NS, "text");
+        t.setAttribute("x", lx.toFixed(2));
+        t.setAttribute("y", ly.toFixed(2));
+        t.setAttribute("text-anchor", "middle");
+        t.setAttribute("dominant-baseline", "middle");
+        t.setAttribute("font-size", "13");
+        t.setAttribute("font-weight", "700");
+        t.setAttribute("fill", lbl.color);
+        if (lbl.rot !== 0) {
+          t.setAttribute("transform", `rotate(${lbl.rot}, ${lx.toFixed(2)}, ${ly.toFixed(2)})`);
+        }
+        t.textContent = lbl.text;
+        boardSvg.appendChild(t);
+      }
+
+      // Draw file letters (a..h) cleanly outside each sector's rank-0 outer edge
+      for (let s = 0; s < 3; s++) {
+        const meta = sectorOutward[s];
+        for (let f = 0; f < 8; f++) {
+          const cell = s * 32 + f;
+          const g = CELL_GEOM[cell];
+          const lx = g.outerMid.x + meta.nx * 16;
+          const ly = g.outerMid.y + meta.ny * 16;
+          const txt = document.createElementNS(SVG_NS, "text");
+          txt.setAttribute("x", lx.toFixed(2));
+          txt.setAttribute("y", ly.toFixed(2));
+          txt.setAttribute("text-anchor", "middle");
+          txt.setAttribute("dominant-baseline", "middle");
+          txt.setAttribute("font-size", "11");
+          txt.setAttribute("font-weight", "600");
+          txt.setAttribute("fill", "#475569");
+          txt.textContent = FILES[f];
+          boardSvg.appendChild(txt);
+        }
       }
     }
-  }
 
-  function renderTelemetry() {
-    if (!gameState) return;
+    function renderTelemetry() {
+      if (!gameState) return;
 
-    const aliveCount = gameState.alive_count;
-    phaseBadge.textContent =
-      aliveCount === 3
-        ? "Phase 1: 3-Player Tri-Sector"
-        : aliveCount === 2
-        ? "Phase 2: 2-Player Endgame"
-        : "Match Concluded";
+      const aliveCount = gameState.alive_count;
+      phaseBadge.textContent =
+        aliveCount === 3
+          ? "Phase 1: 3-Player Tri-Sector"
+          : aliveCount === 2
+            ? "Phase 2: 2-Player Endgame"
+            : "Match Concluded";
 
-    plyBadge.textContent = `Ply ${gameState.ply}`;
+      plyBadge.textContent = `Ply ${gameState.ply}`;
 
-    turnBadge.className = "badge badge-turn";
-    if (gameState.is_game_over) {
-      turnBadge.textContent =
-        gameState.winner !== null && gameState.winner !== undefined
-          ? `Winner: ${PLAYER_NAMES[gameState.winner]}`
-          : "Result: Draw";
-    } else {
-      turnBadge.textContent = `Turn: ${PLAYER_NAMES[gameState.side_to_move]}`;
-      if (gameState.side_to_move === 1) turnBadge.classList.add("turn-red");
-      if (gameState.side_to_move === 2) turnBadge.classList.add("turn-black");
-    }
-
-    if (gameState.last_eliminated_player !== null && gameState.last_eliminated_player !== undefined) {
-      const elimName = PLAYER_NAMES[gameState.last_eliminated_player];
-      elimBanner.classList.remove("hidden");
-      elimText.textContent = `Sudden Disappearance Triggered: ${elimName} was checkmated and ${gameState.last_eliminated_piece_count} remaining pieces were immediately removed from the 96-cell board.`;
-    } else if (!gameState.is_game_over && aliveCount === 3) {
-      elimBanner.classList.add("hidden");
-    }
-
-    for (let p = 0; p < 3; p++) {
-      const card = document.getElementById(`card-player-${p}`);
-      const status = document.getElementById(`status-${p}`);
-      const alive = (gameState.alive_mask & (1 << p)) !== 0;
-      const inChk = gameState.in_check[p];
-
-      card.classList.remove("active-turn", "eliminated");
-      status.className = "pill";
-      if (!alive) {
-        card.classList.add("eliminated");
-        status.classList.add("pill-out");
-        status.textContent = "Eliminated";
-      } else if (inChk) {
-        status.classList.add("pill-check");
-        status.textContent = "In Check";
+      turnBadge.className = "badge badge-turn";
+      if (gameState.is_game_over) {
+        turnBadge.textContent =
+          gameState.winner !== null && gameState.winner !== undefined
+            ? `Winner: ${PLAYER_NAMES[gameState.winner]}`
+            : "Result: Draw";
       } else {
-        status.classList.add("pill-alive");
-        status.textContent = gameState.side_to_move === p && !gameState.is_game_over ? "Active" : "Alive";
+        turnBadge.textContent = `Turn: ${PLAYER_NAMES[gameState.side_to_move]}`;
+        if (gameState.side_to_move === 1) turnBadge.classList.add("turn-red");
+        if (gameState.side_to_move === 2) turnBadge.classList.add("turn-black");
       }
 
-      if (alive && gameState.side_to_move === p && !gameState.is_game_over) {
-        card.classList.add("active-turn");
+      if (gameState.last_eliminated_player !== null && gameState.last_eliminated_player !== undefined) {
+        const elimName = PLAYER_NAMES[gameState.last_eliminated_player];
+        elimBanner.classList.remove("hidden");
+        elimText.textContent = `Sudden Disappearance Triggered: ${elimName} was checkmated and ${gameState.last_eliminated_piece_count} remaining pieces were immediately removed from the 96-cell board.`;
+      } else if (!gameState.is_game_over && aliveCount === 3) {
+        elimBanner.classList.add("hidden");
       }
 
-      document.getElementById(`count-${p}`).textContent = gameState.piece_counts[p];
-      document.getElementById(`eval-${p}`).textContent = gameState.eval_scores[p];
-      document.getElementById(`hex-${p}`).textContent = gameState.occ_hex[p];
-    }
+      for (let p = 0; p < 3; p++) {
+        const card = document.getElementById(`card-player-${p}`);
+        const status = document.getElementById(`status-${p}`);
+        const alive = (gameState.alive_mask & (1 << p)) !== 0;
+        const inChk = gameState.in_check[p];
 
-    if (gameState.elimination_log && gameState.elimination_log.length > 0) {
-      elimLog.classList.remove("empty-state");
-      elimLog.innerHTML = gameState.elimination_log
-        .map(
-          (ev) =>
-            `<div class="log-item">Ply ${ev.ply}: <strong>${ev.eliminated_name}</strong> eliminated by <strong>${ev.by_name}</strong> (${ev.reason}, ${ev.pieces_removed} pieces vanished, ${ev.surviving_count} surviving)</div>`
-        )
+        card.classList.remove("active-turn", "eliminated");
+        status.className = "pill";
+        if (!alive) {
+          card.classList.add("eliminated");
+          status.classList.add("pill-out");
+          status.textContent = "Eliminated";
+        } else if (inChk) {
+          status.classList.add("pill-check");
+          status.textContent = "In Check";
+        } else {
+          status.classList.add("pill-alive");
+          status.textContent = gameState.side_to_move === p && !gameState.is_game_over ? "Active" : "Alive";
+        }
+
+        if (alive && gameState.side_to_move === p && !gameState.is_game_over) {
+          card.classList.add("active-turn");
+        }
+
+        document.getElementById(`count-${p}`).textContent = gameState.piece_counts[p];
+        document.getElementById(`eval-${p}`).textContent = gameState.eval_scores[p];
+        document.getElementById(`hex-${p}`).textContent = gameState.occ_hex[p];
+      }
+
+      if (gameState.elimination_log && gameState.elimination_log.length > 0) {
+        elimLog.classList.remove("empty-state");
+        elimLog.innerHTML = gameState.elimination_log
+          .map(
+            (ev) =>
+              `<div class="log-item">Ply ${ev.ply}: <strong>${ev.eliminated_name}</strong> eliminated by <strong>${ev.by_name}</strong> (${ev.reason}, ${ev.pieces_removed} pieces vanished, ${ev.surviving_count} surviving)</div>`
+          )
+          .join("");
+      } else {
+        elimLog.classList.add("empty-state");
+        elimLog.textContent =
+          "No armies eliminated yet. Checkmate removes all remaining pieces of the mated player immediately.";
+      }
+
+      const hist = [...(gameState.move_history || [])].reverse();
+      moveHistoryEl.innerHTML = hist
+        .map((m) => `<li><strong>${m.player_name}:</strong> <span class="mono">${m.notation}</span></li>`)
         .join("");
-    } else {
-      elimLog.classList.add("empty-state");
-      elimLog.textContent =
-        "No armies eliminated yet. Checkmate removes all remaining pieces of the mated player immediately.";
-    }
+      moveHistoryEl.scrollTop = moveHistoryEl.scrollHeight;
 
-    const hist = [...(gameState.move_history || [])].reverse();
-    moveHistoryEl.innerHTML = hist
-      .map((m) => `<li><strong>${m.player_name}:</strong> <span class="mono">${m.notation}</span></li>`)
-      .join("");
-    moveHistoryEl.scrollTop = moveHistoryEl.scrollHeight;
-
-    if (gameState.ai_telemetry) {
-      const t = gameState.ai_telemetry;
-      telemetryLine.textContent = `${t.phase} | depth ${t.depth} | ${t.nodes} nodes in ${t.time_ms} ms | score ${t.score}`;
-    } else {
-      telemetryLine.textContent = `${gameState.legal_moves ? gameState.legal_moves.length : 0} legal moves available`;
-    }
-  }
-
-  function applyStateUpdate(nextState) {
-    gameState = nextState;
-    selectedCell = null;
-    renderBoard();
-    renderTelemetry();
-  }
-
-  function isCurrentPlayerAI() {
-    if (!gameState || gameState.is_game_over) return false;
-    const sel = document.querySelector(`.controller-select[data-player="${gameState.side_to_move}"]`);
-    return sel && sel.value === "ai";
-  }
-
-  async function onCellClick(cell) {
-    if (busy || !gameState || gameState.is_game_over) return;
-
-    if (selectedCell !== null) {
-      const targets = legalTargetsForCell(selectedCell);
-      const match = targets.find((m) => m.to === cell);
-      if (match) {
-        const promo = match.promo !== 0 ? parseInt(document.getElementById("promo-piece").value, 10) : 0;
-        busy = true;
-        try {
-          const res = await apiPost("/api/move", { from: selectedCell, to: cell, promo });
-          if (res.ok && res.state) {
-            applyStateUpdate(res.state);
-            selectionHint.textContent = "Move executed.";
-            maybeScheduleAI();
-          } else {
-            selectionHint.textContent = res.error || "Illegal move.";
-          }
-        } finally {
-          busy = false;
-        }
-        return;
+      if (gameState.ai_telemetry) {
+        const t = gameState.ai_telemetry;
+        telemetryLine.textContent = `${t.phase} | depth ${t.depth} | ${t.nodes} nodes in ${t.time_ms} ms | score ${t.score}`;
+      } else {
+        telemetryLine.textContent = `${gameState.legal_moves ? gameState.legal_moves.length : 0} legal moves available`;
       }
     }
 
-    const piece = gameState.board[cell];
-    if (piece && piece.owner === gameState.side_to_move) {
-      selectedCell = cell;
-      const targets = legalTargetsForCell(cell);
-      selectionHint.textContent = `Selected ${PLAYER_NAMES[piece.owner]} ${PIECE_NAMES[piece.type]} (${targets.length} legal targets).`;
-      renderBoard();
-    } else {
+    function applyStateUpdate(nextState) {
+      gameState = nextState;
       selectedCell = null;
-      selectionHint.textContent = `Select a piece belonging to ${PLAYER_NAMES[gameState.side_to_move]}.`;
       renderBoard();
+      renderTelemetry();
     }
-  }
 
-  async function stepAI() {
-    if (busy || !gameState || gameState.is_game_over) return false;
-    busy = true;
-    try {
-      const strategy = document.getElementById("ai-strategy").value;
-      const depth = parseInt(document.getElementById("ai-depth").value, 10);
-      const res = await apiPost("/api/ai_move", { strategy, depth });
-      if (res.ok && res.state) {
-        applyStateUpdate(res.state);
-        return !res.state.is_game_over;
-      }
-      return false;
-    } finally {
-      busy = false;
+    function isCurrentPlayerAI() {
+      if (!gameState || gameState.is_game_over) return false;
+      const sel = document.querySelector(`.controller-select[data-player="${gameState.side_to_move}"]`);
+      return sel && sel.value === "ai";
     }
-  }
 
-  function maybeScheduleAI() {
-    if (autoPlayTimer) return;
-    if (isCurrentPlayerAI()) {
-      setTimeout(async () => {
-        if (!autoPlayTimer && isCurrentPlayerAI()) {
-          const cont = await stepAI();
-          if (cont) maybeScheduleAI();
+    async function onCellClick(cell) {
+      if (busy || !gameState || gameState.is_game_over) return;
+
+      if (selectedCell !== null) {
+        const targets = legalTargetsForCell(selectedCell);
+        const match = targets.find((m) => m.to === cell);
+        if (match) {
+          const promo = match.promo !== 0 ? parseInt(document.getElementById("promo-piece").value, 10) : 0;
+          busy = true;
+          try {
+            const res = await apiPost("/api/move", { from: selectedCell, to: cell, promo });
+            if (res.ok && res.state) {
+              applyStateUpdate(res.state);
+              selectionHint.textContent = "Move executed.";
+              maybeScheduleAI();
+            } else {
+              selectionHint.textContent = res.error || "Illegal move.";
+            }
+          } finally {
+            busy = false;
+          }
+          return;
         }
-      }, 220);
+      }
+
+      const piece = gameState.board[cell];
+      if (piece && piece.owner === gameState.side_to_move) {
+        selectedCell = cell;
+        const targets = legalTargetsForCell(cell);
+        selectionHint.textContent = `Selected ${PLAYER_NAMES[piece.owner]} ${PIECE_NAMES[piece.type]} (${targets.length} legal targets).`;
+        renderBoard();
+      } else {
+        selectedCell = null;
+        selectionHint.textContent = `Select a piece belonging to ${PLAYER_NAMES[gameState.side_to_move]}.`;
+        renderBoard();
+      }
     }
-  }
 
-  function stopAutoPlay() {
-    if (autoPlayTimer) {
-      clearInterval(autoPlayTimer);
-      autoPlayTimer = null;
+    async function stepAI() {
+      if (busy || !gameState || gameState.is_game_over) return false;
+      busy = true;
+      try {
+        const strategy = document.getElementById("ai-strategy").value;
+        const depth = parseInt(document.getElementById("ai-depth").value, 10);
+        const res = await apiPost("/api/ai_move", { strategy, depth });
+        if (res.ok && res.state) {
+          applyStateUpdate(res.state);
+          return !res.state.is_game_over;
+        }
+        return false;
+      } finally {
+        busy = false;
+      }
     }
-    btnAutoPlay.classList.remove("btn-active");
-    btnAutoPlay.textContent = "Auto-Play AI";
-  }
 
-  document.getElementById("btn-new").addEventListener("click", async () => {
-    stopAutoPlay();
-    const st = await apiPost("/api/reset");
-    applyStateUpdate(st);
-    selectionHint.textContent = "Standard 48-piece 96-cell board initialized.";
-  });
+    function maybeScheduleAI() {
+      if (autoPlayTimer) return;
+      if (isCurrentPlayerAI()) {
+        setTimeout(async () => {
+          if (!autoPlayTimer && isCurrentPlayerAI()) {
+            const cont = await stepAI();
+            if (cont) maybeScheduleAI();
+          }
+        }, 220);
+      }
+    }
 
-  document.getElementById("btn-demo").addEventListener("click", async () => {
-    stopAutoPlay();
-    const st = await apiPost("/api/demo");
-    applyStateUpdate(st);
-    selectionHint.textContent =
-      "Elimination Demo loaded: Move White Queen from R:f3 to R:g2 (or click Step AI Move) to checkmate Red and observe all Red pieces disappear.";
-  });
+    function stopAutoPlay() {
+      if (autoPlayTimer) {
+        clearInterval(autoPlayTimer);
+        autoPlayTimer = null;
+      }
+      btnAutoPlay.classList.remove("btn-active");
+      btnAutoPlay.textContent = "Auto-Play AI";
+    }
 
-  document.getElementById("btn-ai-step").addEventListener("click", async () => {
-    stopAutoPlay();
-    await stepAI();
-  });
-
-  btnAutoPlay.addEventListener("click", () => {
-    if (autoPlayTimer) {
+    document.getElementById("btn-new").addEventListener("click", async () => {
       stopAutoPlay();
-      return;
-    }
-    btnAutoPlay.classList.add("btn-active");
-    btnAutoPlay.textContent = "Pause Auto-Play";
-    autoPlayTimer = setInterval(async () => {
-      if (gameState && gameState.is_game_over) {
+      const st = await apiPost("/api/reset");
+      applyStateUpdate(st);
+      selectionHint.textContent = "Standard 48-piece 96-cell board initialized.";
+    });
+
+    document.getElementById("btn-demo").addEventListener("click", async () => {
+      stopAutoPlay();
+      const st = await apiPost("/api/demo");
+      applyStateUpdate(st);
+      selectionHint.textContent =
+        "Elimination Demo loaded: Move White Queen from R:f3 to R:g2 (or click Step AI Move) to checkmate Red and observe all Red pieces disappear.";
+    });
+
+    document.getElementById("btn-ai-step").addEventListener("click", async () => {
+      stopAutoPlay();
+      await stepAI();
+    });
+
+    btnAutoPlay.addEventListener("click", () => {
+      if (autoPlayTimer) {
         stopAutoPlay();
         return;
       }
-      if (!busy) {
-        await stepAI();
-      }
-    }, 350);
-  });
+      btnAutoPlay.classList.add("btn-active");
+      btnAutoPlay.textContent = "Pause Auto-Play";
+      autoPlayTimer = setInterval(async () => {
+        if (gameState && gameState.is_game_over) {
+          stopAutoPlay();
+          return;
+        }
+        if (!busy) {
+          await stepAI();
+        }
+      }, 350);
+    });
 
-  function buildOfflinePreviewState() {
-    const board = new Array(96).fill(null);
-    const backRank = [3, 1, 2, 4, 5, 2, 1, 3];
-    for (let s = 0; s < 3; s++) {
-      for (let f = 0; f < 8; f++) {
-        board[s * 32 + f] = { owner: s, type: backRank[f] };
-        board[s * 32 + 8 + f] = { owner: s, type: 0 };
+    function buildOfflinePreviewState() {
+      const board = new Array(96).fill(null);
+      const backRank = [3, 1, 2, 4, 5, 2, 1, 3];
+      for (let s = 0; s < 3; s++) {
+        for (let f = 0; f < 8; f++) {
+          board[s * 32 + f] = { owner: s, type: backRank[f] };
+          board[s * 32 + 8 + f] = { owner: s, type: 0 };
+        }
       }
+      return {
+        board,
+        side_to_move: 0,
+        alive_mask: 7,
+        alive_count: 3,
+        ply: 0,
+        is_game_over: false,
+        winner: null,
+        in_check: [false, false, false],
+        last_eliminated_player: null,
+        last_eliminated_piece_count: 0,
+        legal_moves: [],
+        occ_hex: [
+          "0x00000000_00000000_0000FFFF",
+          "0x00000000_0000FFFF_00000000",
+          "0x0000FFFF_00000000_00000000"
+        ],
+        piece_counts: [16, 16, 16],
+        eval_scores: [0, 0, 0],
+        move_history: [],
+        elimination_log: [],
+        ai_telemetry: null
+      };
     }
-    return {
-      board,
-      side_to_move: 0,
-      alive_mask: 7,
-      alive_count: 3,
-      ply: 0,
-      is_game_over: false,
-      winner: null,
-      in_check: [false, false, false],
-      last_eliminated_player: null,
-      last_eliminated_piece_count: 0,
-      legal_moves: [],
-      occ_hex: [
-        "0x00000000_00000000_0000FFFF",
-        "0x00000000_0000FFFF_00000000",
-        "0x0000FFFF_00000000_00000000"
-      ],
-      piece_counts: [16, 16, 16],
-      eval_scores: [0, 0, 0],
-      move_history: [],
-      elimination_log: [],
-      ai_telemetry: null
-    };
-  }
 
-  (async function init() {
-    try {
-      const st = await apiGet("/api/state");
-      applyStateUpdate(st);
-    } catch (_err) {
-      applyStateUpdate(buildOfflinePreviewState());
-      telemetryLine.textContent = "Server disconnected - run mix three_chess.serve";
-      selectionHint.textContent =
-        "Rendering static board preview. Start the Elixir/OTP server with mix three_chess.serve to play.";
-    }
-  })();
-})();
+    (async function init() {
+      try {
+        const st = await apiGet("/api/state");
+        applyStateUpdate(st);
+      } catch (_err) {
+        applyStateUpdate(buildOfflinePreviewState());
+        telemetryLine.textContent = "Server disconnected - run mix three_chess.serve";
+        selectionHint.textContent =
+          "Rendering static board preview. Start the Elixir/OTP server with mix three_chess.serve to play.";
+      }
+    })();
+  }) ();
