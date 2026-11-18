@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3-Chess: 96-Cell Three-Player Elimination Chess</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32" width="28" height="28">
+            <polygon points="16,2 28,9 28,23 16,30 4,23 4,9" fill="#ffffff" stroke="#0f172a" stroke-width="2" />
+            <line x1="16" y1="16" x2="4" y2="16" stroke="#dc2626" stroke-width="1.8" />
+            <line x1="16" y1="16" x2="22" y2="5.5" stroke="#0f172a" stroke-width="1.8" />
+            <line x1="16" y1="16" x2="22" y2="26.5" stroke="#475569" stroke-width="1.8" />
+          </svg>
+        </div>
+        <div>
+          <h1>3-Chess</h1>
+          <p class="subtitle">96-Cell Three-Sector Topology | u96 Bitboard Engine | Sudden Army Disappearance</p>
+        </div>
+      </div>
+      <div class="topbar-badges">
+        <span id="phase-badge" class="badge badge-phase">Phase 1: 3-Player Tri-Sector</span>
+        <span id="turn-badge" class="badge badge-turn">Turn: White</span>
+        <span id="ply-badge" class="badge badge-neutral">Ply 0</span>
+      </div>
+    </header>
+
+    <div id="elimination-banner" class="elimination-banner hidden" role="status">
+      <span id="elimination-text"></span>
+    </div>
+
+    <main class="workspace">
+      <section class="board-card">
+        <div class="board-toolbar">
+          <div class="btn-group">
+            <button id="btn-new" class="btn btn-primary" type="button">New Standard Game</button>
+            <button id="btn-demo" class="btn btn-accent" type="button">Load Sudden-Elimination Demo</button>
+            <button id="btn-ai-step" class="btn btn-secondary" type="button">Step AI Move</button>
+            <button id="btn-autoplay" class="btn btn-secondary" type="button">Auto-Play AI</button>
+          </div>
+          <div class="select-group">
+            <label for="ai-strategy">Search
+              <select id="ai-strategy">
+                <option value="paranoid">Paranoid (Alpha-Beta)</option>
+                <option value="maxn">MaxN (3-Tuple)</option>
+              </select>
+            </label>
+            <label for="ai-depth">Depth
+              <select id="ai-depth">
+                <option value="2" selected>2 Ply</option>
+                <option value="3">3 Ply</option>
+              </select>
+            </label>
+            <label for="promo-piece">Promote
+              <select id="promo-piece">
+                <option value="4" selected>Queen</option>
+                <option value="3">Rook</option>
+                <option value="2">Bishop</option>
+                <option value="1">Knight</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div class="board-stage">
+          <svg id="board-svg" viewBox="0 0 840 840" role="img" aria-label="96-cell three-player chess board"></svg>
+        </div>
+
+        <div class="board-footer">
+          <span id="selection-hint">Select a piece belonging to the active player to highlight legal moves across the three sectors.</span>
+          <span id="telemetry-line" class="mono">Engine ready</span>
+        </div>
+      </section>
+
+      <aside class="sidebar">
+        <section class="panel">
+          <h2>Army Status and u96 Bitboard Masks</h2>
+          <div class="army-cards">
+            <article id="card-player-0" class="army-card active-turn">
+              <div class="army-head">
+                <span class="swatch swatch-white"></span>
+                <strong>White (Sector 0)</strong>
+                <span id="status-0" class="pill pill-alive">Active</span>
+              </div>
+              <div class="army-meta">
+                <label>Controller:
+                  <select class="controller-select" data-player="0">
+                    <option value="human" selected>Human</option>
+                    <option value="ai">AI Engine</option>
+                  </select>
+                </label>
+                <span>Pieces: <strong id="count-0">16</strong></span>
+                <span>Utility: <strong id="eval-0">0</strong></span>
+              </div>
+              <div id="hex-0" class="bitboard-hex mono">0x00000000_00000000_0000FFFF</div>
+            </article>
+
+            <article id="card-player-1" class="army-card">
+              <div class="army-head">
+                <span class="swatch swatch-red"></span>
+                <strong>Red (Sector 1)</strong>
+                <span id="status-1" class="pill pill-alive">Alive</span>
+              </div>
+              <div class="army-meta">
+                <label>Controller:
+                  <select class="controller-select" data-player="1">
+                    <option value="human">Human</option>
+                    <option value="ai" selected>AI Engine</option>
+                  </select>
+                </label>
+                <span>Pieces: <strong id="count-1">16</strong></span>
+                <span>Utility: <strong id="eval-1">0</strong></span>
+              </div>
+              <div id="hex-1" class="bitboard-hex mono">0x00000000_0000FFFF_00000000</div>
+            </article>
+
+            <article id="card-player-2" class="army-card">
+              <div class="army-head">
+                <span class="swatch swatch-black"></span>
+                <strong>Black (Sector 2)</strong>
+                <span id="status-2" class="pill pill-alive">Alive</span>
+              </div>
+              <div class="army-meta">
+                <label>Controller:
+                  <select class="controller-select" data-player="2">
+                    <option value="human">Human</option>
+                    <option value="ai" selected>AI Engine</option>
+                  </select>
+                </label>
+                <span>Pieces: <strong id="count-2">16</strong></span>
+                <span>Utility: <strong id="eval-2">0</strong></span>
+              </div>
+              <div id="hex-2" class="bitboard-hex mono">0x0000FFFF_00000000_00000000</div>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Elimination Ledger</h2>
+          <div id="elimination-log" class="log-box empty-state">
+            No armies eliminated yet. Checkmate removes all remaining pieces of the mated player immediately.
+          </div>
+        </section>
+
+        <section class="panel panel-grow">
+          <h2>Move Log</h2>
+          <ol id="move-history" class="move-list"></ol>
+        </section>
+      </aside>
+    </main>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -1,8 +1,19 @@
+# Zig artifacts
 .zig-cache/
 zig-out/
 zig-pkg/
 *.o
-	
+
+# Elixir / Erlang artifacts
+/_build/
+/deps/
+*.ez
+erl_crash.dump
+.elixir_ls/
+/cover/
+/doc/
+/.fetch
+
 # Design artifacts
 _paper
 _bmad
