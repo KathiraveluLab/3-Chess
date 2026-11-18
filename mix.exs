@@ -1,3 +1,5 @@
+System.put_env("MIX_OS_CONCURRENCY_LOCK", "0")
+
 defmodule ThreeChess.MixProject do
   use Mix.Project
 

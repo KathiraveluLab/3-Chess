@@ -37,24 +37,23 @@
 
 ### Elixir/OTP 29 Runtime
 
+Navigate to the project root directory before running these commands.
+
 Run unit tests:
 
 ```powershell
-$env:MIX_OS_CONCURRENCY_LOCK="0"
 mix test
 ```
 
 Run Perft, Sudden Disappearance verification, and AI benchmarks:
 
 ```powershell
-$env:MIX_OS_CONCURRENCY_LOCK="0"
 mix three_chess.bench
 ```
 
 Start the interactive web interface (then open `http://127.0.0.1:8080/`):
 
 ```powershell
-$env:MIX_OS_CONCURRENCY_LOCK="0"
 mix three_chess.serve
 ```
 
