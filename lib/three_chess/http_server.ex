@@ -53,7 +53,7 @@ defmodule ThreeChess.HttpServer do
   defp lan_priority(_, _), do: 3
 
   @spec start(pos_integer(), String.t(), keyword()) :: no_return()
-  def start(port \\ 8080, web_dir \\ "web", opts \\ []) do
+  def start(port \\ 9090, web_dir \\ "web", opts \\ []) do
     host_str = Keyword.get(opts, :host, "0.0.0.0")
 
     ip_tuple =

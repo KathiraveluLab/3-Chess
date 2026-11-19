@@ -16,7 +16,7 @@ pub fn main(init: std.process.Init) !void {
     const out = &stdout_file.interface;
 
     if (args.len > 1 and std.mem.eql(u8, args[1], "--serve")) {
-        const port: u16 = if (args.len > 2) try std.fmt.parseInt(u16, args[2], 10) else 8080;
+        const port: u16 = if (args.len > 2) try std.fmt.parseInt(u16, args[2], 10) else 9090;
         const host: []const u8 = if (args.len > 3) args[3] else "0.0.0.0";
         try serveHttp(arena, io, out, host, port);
         return;

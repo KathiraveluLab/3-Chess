@@ -182,10 +182,10 @@ defmodule ThreeChessTest do
     refute "127.0.0.1" in ips
 
     start_supervised!(GameServer)
-    :ok = GameServer.set_lan_urls(["http://192.168.1.42:8080/"])
+    :ok = GameServer.set_lan_urls(["http://192.168.1.42:9090/"])
 
     initial_sub = GameServer.subscribe(self())
-    assert initial_sub.lan_urls == ["http://192.168.1.42:8080/"]
+    assert initial_sub.lan_urls == ["http://192.168.1.42:9090/"]
     assert initial_sub.connected_clients == 1
 
     # Client A claims White seat (0) via HTTP endpoint

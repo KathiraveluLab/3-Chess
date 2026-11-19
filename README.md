@@ -37,17 +37,17 @@
 
 ## Local Network (LAN) Multiplayer
 
-By default, `mix three_chess.serve` binds to `0.0.0.0:8080` so players on other computers or devices on the same Wi-Fi or local network can join the same match in real time:
+By default, `mix three_chess.serve` binds to `0.0.0.0:9090` so players on other computers or devices on the same Wi-Fi or local network can join the same match in real time:
 
 1. Start the server from the project root on the host computer:
    ```powershell
    mix three_chess.serve
    ```
-   The server prints both the local URL (`http://127.0.0.1:8080/`) and all detected local network URLs (for example, `http://192.168.x.x:8080/`).
+   The server prints both the local URL (`http://127.0.0.1:9090/`) and all detected local network URLs (for example, `http://192.168.x.x:9090/`).
 2. Share the printed **Network** URL (also shown in the **Local Network (LAN) Lobby** panel in the UI) with up to two other players on the same local network.
 3. Each player enters their name and clicks **Claim Seat** on **White**, **Red**, or **Black**. Any unclaimed seat can remain set to **AI Engine** for mixed human-and-AI matches.
 4. Board moves, seat claims, controller changes, and eliminations synchronize automatically across all connected browsers via Server-Sent Events (`/api/events`). Each client can keep **Board View** on **Auto (My Seat)** to orient their own sector to the bottom of their screen.
-5. **Firewall Note:** If remote computers cannot reach the host URL, allow incoming TCP connections on port `8080` (or permit `erl.exe` on Private networks) in your host operating system's firewall. To restrict the server to the local machine only, pass `--host 127.0.0.1`.
+5. **Firewall Note:** If remote computers cannot reach the host URL, allow incoming TCP connections on port `9090` (or permit `erl.exe` on Private networks) in your host operating system's firewall. To restrict the server to the local machine only, pass `--host 127.0.0.1`.
 
 ## Running Tests, Benchmarks, and the Web UI
 
@@ -67,7 +67,7 @@ Run Perft, Sudden Disappearance verification, and AI benchmarks:
 mix three_chess.bench
 ```
 
-Start the interactive web interface for local and LAN play (defaults to `--host 0.0.0.0 --port 8080`):
+Start the interactive web interface for local and LAN play (defaults to `--host 0.0.0.0 --port 9090`):
 
 ```powershell
 mix three_chess.serve
@@ -76,7 +76,7 @@ mix three_chess.serve
 Optional host and port overrides:
 
 ```powershell
-mix three_chess.serve --host 127.0.0.1 --port 8080
+mix three_chess.serve --host 127.0.0.1 --port 9090
 ```
 
 ### Zig Toolchain (Optional Native / WASM Build)
