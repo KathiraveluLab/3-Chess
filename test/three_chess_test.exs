@@ -170,4 +170,72 @@ defmodule ThreeChessTest do
     assert ai_decoded["state"]["alive_count"] == 2
     assert ai_decoded["state"]["last_eliminated_player"] == 1
   end
+
+  test "LAN host parsing, seat ownership, stale AI guard, and live SSE broadcasts" do
+    assert HttpServer.parse_host("0.0.0.0") == {:ok, {0, 0, 0, 0}}
+    assert HttpServer.parse_host("127.0.0.1") == {:ok, {127, 0, 0, 1}}
+    assert HttpServer.parse_host("192.168.1.42") == {:ok, {192, 168, 1, 42}}
+    assert HttpServer.parse_host("not-an-ip") == {:error, :invalid_host}
+
+    ips = HttpServer.local_ipv4_addresses()
+    assert is_list(ips)
+    refute "127.0.0.1" in ips
+
+    start_supervised!(GameServer)
+    :ok = GameServer.set_lan_urls(["http://192.168.1.42:8080/"])
+
+    initial_sub = GameServer.subscribe(self())
+    assert initial_sub.lan_urls == ["http://192.168.1.42:8080/"]
+    assert initial_sub.connected_clients == 1
+
+    # Client A claims White seat (0) via HTTP endpoint
+    claim_body = JSON.encode!(%{action: "claim", player: 0, client_id: "client-a", name: "Alice"})
+    claim_req = "POST /api/seat HTTP/1.1\r\nContent-Length: #{byte_size(claim_body)}\r\n\r\n#{claim_body}"
+    raw_claim = HttpServer.process_raw_request(claim_req, "web")
+    assert String.starts_with?(raw_claim, "HTTP/1.1 200 OK")
+    [_hc, claim_json] = String.split(raw_claim, "\r\n\r\n", parts: 2)
+    {:ok, claim_resp} = JSON.decode(claim_json)
+    assert claim_resp["ok"] == true
+    assert Enum.at(claim_resp["state"]["seats"], 0)["name"] == "Alice"
+    assert_receive {:three_chess_event, _broadcast_json}
+
+    # Client B cannot claim White while Alice holds it
+    conflict = GameServer.claim_seat(0, "client-b", "Bob")
+    refute conflict.ok
+
+    # Client B cannot move White's pawn e2 -> e4
+    e2 = Topology.to_cell(0, 1, 4)
+    e4 = Topology.to_cell(0, 3, 4)
+    blocked_move = GameServer.make_move(e2, e4, 0, "client-b")
+    refute blocked_move.ok
+    assert String.contains?(blocked_move.error, "Alice")
+
+    # Client A moves White's pawn e2 -> e4 successfully and broadcasts to subscribers
+    ok_move = GameServer.make_move(e2, e4, 0, "client-a")
+    assert ok_move.ok
+    assert ok_move.state.ply == 1
+    assert ok_move.state.side_to_move == 1
+    assert_receive {:three_chess_event, move_broadcast}
+    {:ok, moved_payload} = JSON.decode(move_broadcast)
+    assert moved_payload["ply"] == 1
+
+    # Stale expected_ply guard prevents duplicate AI moves across LAN browsers
+    stale_ai = GameServer.ai_move(:paranoid, 2, 0)
+    refute stale_ai.ok
+    assert stale_ai.stale == true
+    assert stale_ai.state.ply == 1
+
+    valid_ai = GameServer.ai_move(:paranoid, 2, 1)
+    assert valid_ai.ok
+    assert valid_ai.state.ply == 2
+    assert_receive {:three_chess_event, _ai_broadcast}
+
+    # Client A releases seat and unsubscribes cleanly
+    rel = GameServer.release_seat(0, "client-a")
+    assert rel.ok
+    assert Enum.at(rel.state.seats, 0).client_id == nil
+    assert_receive {:three_chess_event, _rel_broadcast}
+
+    GameServer.unsubscribe(self())
+  end
 end

@@ -17,7 +17,8 @@ pub fn main(init: std.process.Init) !void {
 
     if (args.len > 1 and std.mem.eql(u8, args[1], "--serve")) {
         const port: u16 = if (args.len > 2) try std.fmt.parseInt(u16, args[2], 10) else 8080;
-        try serveHttp(arena, io, out, port);
+        const host: []const u8 = if (args.len > 3) args[3] else "0.0.0.0";
+        try serveHttp(arena, io, out, host, port);
         return;
     }
 
@@ -75,12 +76,12 @@ fn runBenchmark(io: Io, out: anytype) !void {
     }
 }
 
-fn serveHttp(arena: std.mem.Allocator, io: Io, out: anytype, port: u16) !void {
-    const addr = try Io.net.IpAddress.parse("127.0.0.1", port);
+fn serveHttp(arena: std.mem.Allocator, io: Io, out: anytype, host: []const u8, port: u16) !void {
+    const addr = try Io.net.IpAddress.parse(host, port);
     var server = try addr.listen(io, .{ .reuse_address = true });
     defer server.deinit(io);
 
-    try out.print("3-Chess HTTP server listening on http://127.0.0.1:{d}/\n", .{port});
+    try out.print("3-Chess HTTP server listening on http://{s}:{d}/\n", .{ host, port });
     try out.flush();
 
     var req_buf: [4096]u8 = undefined;

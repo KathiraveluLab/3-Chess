@@ -86,6 +86,24 @@ body {
   background: var(--surface-muted);
 }
 
+.badge-sync {
+  background: var(--amber-soft);
+  border-color: #fde68a;
+  color: var(--amber);
+}
+
+.badge-sync.sync-live {
+  background: var(--green-soft);
+  border-color: #bbf7d0;
+  color: var(--green);
+}
+
+.badge-sync.sync-offline {
+  background: var(--red-soft);
+  border-color: #fecaca;
+  color: var(--red);
+}
+
 .badge-phase {
   background: var(--accent-soft);
   border-color: #bfdbfe;
@@ -126,7 +144,7 @@ body {
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.85fr);
+  grid-template-columns: minmax(0, 1.35fr) minmax(340px, 0.85fr);
   gap: 16px;
   align-items: start;
 }
@@ -179,6 +197,12 @@ body {
   background: var(--surface-muted);
 }
 
+.btn-xs {
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  border-radius: 5px;
+}
+
 .btn-primary {
   background: #0f172a;
   border-color: #0f172a;
@@ -205,6 +229,12 @@ body {
   color: var(--green);
 }
 
+.btn-seat-mine {
+  background: var(--accent-soft);
+  border-color: #93c5fd;
+  color: #1e40af;
+}
+
 label {
   font-size: 0.78rem;
   color: var(--text-muted);
@@ -213,13 +243,18 @@ label {
   gap: 5px;
 }
 
-select {
+select,
+.text-input {
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
   border-radius: 6px;
   padding: 4px 8px;
   font-size: 0.8rem;
+}
+
+.text-input {
+  width: 120px;
 }
 
 .board-stage {
@@ -270,6 +305,54 @@ select {
   color: var(--text);
 }
 
+.panel-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.panel-head-row h2 {
+  margin: 0;
+}
+
+.lan-url-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface-muted);
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 5px 8px;
+  margin-bottom: 8px;
+}
+
+.lan-url-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.lan-url-code {
+  font-size: 0.76rem;
+  color: #0f172a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.lan-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
 .army-cards {
   display: flex;
   flex-direction: column;
@@ -298,6 +381,22 @@ select {
   align-items: center;
   gap: 8px;
   margin-bottom: 6px;
+}
+
+.seat-tag {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  background: var(--surface-muted);
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+
+.seat-tag.seat-mine {
+  background: var(--accent-soft);
+  border-color: #bfdbfe;
+  color: #1e40af;
+  font-weight: 600;
 }
 
 .swatch {
@@ -386,7 +485,7 @@ select {
 .move-list {
   margin: 0;
   padding-left: 22px;
-  max-height: 220px;
+  max-height: 200px;
   overflow-y: auto;
   font-size: 0.8rem;
 }

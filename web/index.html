@@ -20,10 +20,11 @@
         </div>
         <div>
           <h1>3-Chess</h1>
-          <p class="subtitle">96-Cell Three-Sector Topology | u96 Bitboard Engine | Sudden Army Disappearance</p>
+          <p class="subtitle">96-Cell Three-Sector Topology | u96 Bitboard Engine | LAN Multiplayer</p>
         </div>
       </div>
       <div class="topbar-badges">
+        <span id="sync-badge" class="badge badge-sync">Connecting...</span>
         <span id="phase-badge" class="badge badge-phase">Phase 1: 3-Player Tri-Sector</span>
         <span id="turn-badge" class="badge badge-turn">Turn: White</span>
         <span id="ply-badge" class="badge badge-neutral">Ply 0</span>
@@ -78,13 +79,39 @@
       </section>
 
       <aside class="sidebar">
+        <section class="panel lan-panel">
+          <div class="panel-head-row">
+            <h2>Local Network (LAN) Lobby</h2>
+            <span id="clients-badge" class="pill pill-alive">1 connected</span>
+          </div>
+          <div class="lan-url-row">
+            <span class="lan-url-label">Join URL</span>
+            <code id="lan-url-text" class="lan-url-code mono">http://127.0.0.1:8080/</code>
+            <button id="btn-copy-url" class="btn btn-xs" type="button">Copy</button>
+          </div>
+          <div class="lan-controls">
+            <label for="player-name">Your Name
+              <input id="player-name" class="text-input" type="text" maxlength="24" placeholder="Player name" />
+            </label>
+            <label for="board-orientation">Board View
+              <select id="board-orientation">
+                <option value="auto" selected>Auto (My Seat)</option>
+                <option value="0">White Bottom</option>
+                <option value="1">Red Bottom</option>
+                <option value="2">Black Bottom</option>
+              </select>
+            </label>
+          </div>
+        </section>
+
         <section class="panel">
-          <h2>Army Status and u96 Bitboard Masks</h2>
+          <h2>Army Status, Seats, and u96 Bitboards</h2>
           <div class="army-cards">
             <article id="card-player-0" class="army-card active-turn">
               <div class="army-head">
                 <span class="swatch swatch-white"></span>
                 <strong>White (Sector 0)</strong>
+                <span id="seat-label-0" class="seat-tag">Open Seat</span>
                 <span id="status-0" class="pill pill-alive">Active</span>
               </div>
               <div class="army-meta">
@@ -94,6 +121,7 @@
                     <option value="ai">AI Engine</option>
                   </select>
                 </label>
+                <button id="seat-btn-0" class="btn btn-xs seat-btn" data-player="0" type="button">Claim Seat</button>
                 <span>Pieces: <strong id="count-0">16</strong></span>
                 <span>Utility: <strong id="eval-0">0</strong></span>
               </div>
@@ -104,6 +132,7 @@
               <div class="army-head">
                 <span class="swatch swatch-red"></span>
                 <strong>Red (Sector 1)</strong>
+                <span id="seat-label-1" class="seat-tag">AI Engine</span>
                 <span id="status-1" class="pill pill-alive">Alive</span>
               </div>
               <div class="army-meta">
@@ -113,6 +142,7 @@
                     <option value="ai" selected>AI Engine</option>
                   </select>
                 </label>
+                <button id="seat-btn-1" class="btn btn-xs seat-btn" data-player="1" type="button">Claim Seat</button>
                 <span>Pieces: <strong id="count-1">16</strong></span>
                 <span>Utility: <strong id="eval-1">0</strong></span>
               </div>
@@ -123,6 +153,7 @@
               <div class="army-head">
                 <span class="swatch swatch-black"></span>
                 <strong>Black (Sector 2)</strong>
+                <span id="seat-label-2" class="seat-tag">AI Engine</span>
                 <span id="status-2" class="pill pill-alive">Alive</span>
               </div>
               <div class="army-meta">
@@ -132,6 +163,7 @@
                     <option value="ai" selected>AI Engine</option>
                   </select>
                 </label>
+                <button id="seat-btn-2" class="btn btn-xs seat-btn" data-player="2" type="button">Claim Seat</button>
                 <span>Pieces: <strong id="count-2">16</strong></span>
                 <span>Utility: <strong id="eval-2">0</strong></span>
               </div>

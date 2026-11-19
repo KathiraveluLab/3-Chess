@@ -32,8 +32,22 @@
 - `lib/three_chess/topology_builder.ex` and `lib/three_chess/topology.ex`: Compile-time 96-bit bitboard lookup tables and fast bit scanning for BEAM arbitrary-precision integers.
 - `lib/three_chess/board.ex` and `lib/three_chess/movegen.ex`: 96-bit bitboard state management, legal move generation, Perft, and sudden-disappearance checkmate handling.
 - `lib/three_chess/ai.ex`: MaxN, Paranoid, and 2-player Alpha-Beta search with node and timing telemetry.
-- `lib/three_chess/game_server.ex` and `lib/three_chess/http_server.ex`: OTP `GenServer` match controller and zero-dependency HTTP/JSON server.
-- `web/index.html`, `web/style.css`, and `web/app.js`: Clean light-theme SVG hexagonal-perimeter board with bilinearly interpolated quadrilateral cells, vector piece silhouettes, legal move highlights, live `u96` hexadecimal bitboard masks, an elimination ledger, and a 1-move Sudden-Elimination tactical demo.
+- `lib/three_chess/game_server.ex` and `lib/three_chess/http_server.ex`: OTP `GenServer` match controller with LAN seat management and a zero-dependency HTTP/JSON + Server-Sent Events (SSE) server.
+- `web/index.html`, `web/style.css`, and `web/app.js`: Clean light-theme SVG hexagonal-perimeter board with bilinearly interpolated quadrilateral cells, vector piece silhouettes, legal move highlights, live `u96` hexadecimal bitboard masks, LAN seat claiming and automatic board rotation, an elimination ledger, and a 1-move Sudden-Elimination tactical demo.
+
+## Local Network (LAN) Multiplayer
+
+By default, `mix three_chess.serve` binds to `0.0.0.0:8080` so players on other computers or devices on the same Wi-Fi or local network can join the same match in real time:
+
+1. Start the server from the project root on the host computer:
+   ```powershell
+   mix three_chess.serve
+   ```
+   The server prints both the local URL (`http://127.0.0.1:8080/`) and all detected local network URLs (for example, `http://192.168.x.x:8080/`).
+2. Share the printed **Network** URL (also shown in the **Local Network (LAN) Lobby** panel in the UI) with up to two other players on the same local network.
+3. Each player enters their name and clicks **Claim Seat** on **White**, **Red**, or **Black**. Any unclaimed seat can remain set to **AI Engine** for mixed human-and-AI matches.
+4. Board moves, seat claims, controller changes, and eliminations synchronize automatically across all connected browsers via Server-Sent Events (`/api/events`). Each client can keep **Board View** on **Auto (My Seat)** to orient their own sector to the bottom of their screen.
+5. **Firewall Note:** If remote computers cannot reach the host URL, allow incoming TCP connections on port `8080` (or permit `erl.exe` on Private networks) in your host operating system's firewall. To restrict the server to the local machine only, pass `--host 127.0.0.1`.
 
 ## Running Tests, Benchmarks, and the Web UI
 
@@ -53,10 +67,16 @@ Run Perft, Sudden Disappearance verification, and AI benchmarks:
 mix three_chess.bench
 ```
 
-Start the interactive web interface (then open `http://127.0.0.1:8080/`):
+Start the interactive web interface for local and LAN play (defaults to `--host 0.0.0.0 --port 8080`):
 
 ```powershell
 mix three_chess.serve
+```
+
+Optional host and port overrides:
+
+```powershell
+mix three_chess.serve --host 127.0.0.1 --port 8080
 ```
 
 ### Zig Toolchain (Optional Native / WASM Build)

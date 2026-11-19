@@ -1,17 +1,85 @@
 defmodule ThreeChess.HttpServer do
   @moduledoc """
-  Zero-dependency HTTP server built over :gen_tcp for serving the 3-Chess web
-  interface and JSON game API.
+  Zero-dependency HTTP and Server-Sent Events (SSE) server built over :gen_tcp
+  for serving the 3-Chess web interface and LAN multiplayer JSON API.
   """
 
   alias ThreeChess.GameServer
 
-  @spec start(pos_integer(), String.t()) :: no_return()
-  def start(port \\ 8080, web_dir \\ "web") do
+  @sse_heartbeat_ms 15_000
+
+  @doc "Parses an IPv4 host string such as \"0.0.0.0\" or \"127.0.0.1\" into an Erlang IP tuple."
+  @spec parse_host(String.t()) :: {:ok, :inet.ip4_address()} | {:error, :invalid_host}
+  def parse_host(host) when is_binary(host) do
+    case host |> String.trim() |> String.to_charlist() |> :inet.parse_ipv4_address() do
+      {:ok, ip} -> {:ok, ip}
+      {:error, _} -> {:error, :invalid_host}
+    end
+  end
+
+  def parse_host(_), do: {:error, :invalid_host}
+
+  @doc "Returns non-loopback, non-link-local IPv4 addresses detected on local network interfaces."
+  @spec local_ipv4_addresses() :: [String.t()]
+  def local_ipv4_addresses do
+    case :inet.getifaddrs() do
+      {:ok, ifaddrs} ->
+        ifaddrs
+        |> Enum.flat_map(fn {_name, opts} ->
+          flags = Keyword.get(opts, :flags, [])
+
+          if :up in flags and :loopback not in flags do
+            for {:addr, {a, b, c, d}} <- opts,
+                a != 127,
+                not (a == 169 and b == 254) do
+              {lan_priority(a, b), "#{a}.#{b}.#{c}.#{d}"}
+            end
+          else
+            []
+          end
+        end)
+        |> Enum.uniq_by(fn {_prio, ip} -> ip end)
+        |> Enum.sort()
+        |> Enum.map(fn {_prio, ip} -> ip end)
+
+      {:error, _} ->
+        []
+    end
+  end
+
+  defp lan_priority(192, 168), do: 0
+  defp lan_priority(10, _), do: 1
+  defp lan_priority(172, b) when b >= 16 and b <= 31, do: 2
+  defp lan_priority(_, _), do: 3
+
+  @spec start(pos_integer(), String.t(), keyword()) :: no_return()
+  def start(port \\ 8080, web_dir \\ "web", opts \\ []) do
+    host_str = Keyword.get(opts, :host, "0.0.0.0")
+
+    ip_tuple =
+      case parse_host(host_str) do
+        {:ok, ip} -> ip
+        {:error, _} -> {0, 0, 0, 0}
+      end
+
     case GameServer.start_link() do
       {:ok, _} -> :ok
       {:error, {:already_started, _}} -> :ok
     end
+
+    lan_urls =
+      case ip_tuple do
+        {0, 0, 0, 0} ->
+          Enum.map(local_ipv4_addresses(), fn ip -> "http://#{ip}:#{port}/" end)
+
+        {127, 0, 0, 1} ->
+          []
+
+        {a, b, c, d} ->
+          ["http://#{a}.#{b}.#{c}.#{d}:#{port}/"]
+      end
+
+    GameServer.set_lan_urls(lan_urls)
 
     {:ok, listen_socket} =
       :gen_tcp.listen(port, [
@@ -19,11 +87,30 @@ defmodule ThreeChess.HttpServer do
         packet: :raw,
         active: false,
         reuseaddr: true,
-        ip: {127, 0, 0, 1}
+        ip: ip_tuple
       ])
 
-    IO.puts("3-Chess server listening on http://127.0.0.1:#{port}/")
+    print_startup_banner(ip_tuple, port, lan_urls)
     accept_loop(listen_socket, web_dir)
+  end
+
+  defp print_startup_banner({0, 0, 0, 0}, port, lan_urls) do
+    IO.puts("3-Chess LAN multiplayer server listening on 0.0.0.0:#{port}")
+    IO.puts("  Local:   http://127.0.0.1:#{port}/")
+
+    case lan_urls do
+      [] ->
+        IO.puts("  Network: No active non-loopback IPv4 interface detected")
+
+      urls ->
+        Enum.each(urls, fn url ->
+          IO.puts("  Network: #{url}")
+        end)
+    end
+  end
+
+  defp print_startup_banner({a, b, c, d}, port, _lan_urls) do
+    IO.puts("3-Chess server listening on http://#{a}.#{b}.#{c}.#{d}:#{port}/")
   end
 
   defp accept_loop(listen_socket, web_dir) do
@@ -39,15 +126,58 @@ defmodule ThreeChess.HttpServer do
 
   defp handle_client(socket, web_dir) do
     case read_http_request(socket, "") do
+      {:ok, "GET", "/api/events", _body} ->
+        handle_sse(socket)
+
       {:ok, method, path, body} ->
         {status, content_type, resp_body} = route(method, path, body, web_dir)
         send_response(socket, status, content_type, resp_body)
+        :gen_tcp.close(socket)
 
       :error ->
         send_response(socket, "400 Bad Request", "text/plain", "Bad Request")
+        :gen_tcp.close(socket)
+    end
+  end
+
+  defp handle_sse(socket) do
+    headers =
+      "HTTP/1.1 200 OK\r\n" <>
+        "Content-Type: text/event-stream; charset=utf-8\r\n" <>
+        "Cache-Control: no-cache\r\n" <>
+        "Connection: keep-alive\r\n" <>
+        "Access-Control-Allow-Origin: *\r\n" <>
+        "X-Accel-Buffering: no\r\n\r\n"
+
+    initial_payload = GameServer.subscribe(self())
+    initial_chunk = "data: " <> JSON.encode!(initial_payload) <> "\n\n"
+
+    case :gen_tcp.send(socket, [headers, initial_chunk]) do
+      :ok ->
+        sse_loop(socket)
+
+      {:error, _} ->
+        :ok
     end
 
+    GameServer.unsubscribe(self())
     :gen_tcp.close(socket)
+  end
+
+  defp sse_loop(socket) do
+    receive do
+      {:three_chess_event, encoded_json} ->
+        case :gen_tcp.send(socket, ["data: ", encoded_json, "\n\n"]) do
+          :ok -> sse_loop(socket)
+          {:error, _} -> :ok
+        end
+    after
+      @sse_heartbeat_ms ->
+        case :gen_tcp.send(socket, ": keepalive\n\n") do
+          :ok -> sse_loop(socket)
+          {:error, _} -> :ok
+        end
+    end
   end
 
   @doc "Processes a raw HTTP/1.1 request buffer and returns the full HTTP response binary."
@@ -109,7 +239,10 @@ defmodule ThreeChess.HttpServer do
       case String.split(h, ":", parts: 2) do
         [k, v] ->
           if String.downcase(String.trim(k)) == "content-length" do
-            String.trim(v) |> String.to_integer()
+            case Integer.parse(String.trim(v)) do
+              {n, _} when n >= 0 -> n
+              _ -> 0
+            end
           end
 
         _ ->
@@ -129,6 +262,10 @@ defmodule ThreeChess.HttpServer do
     end
   end
 
+  defp route("OPTIONS", _path, _body, _web_dir) do
+    {"204 No Content", "text/plain; charset=utf-8", ""}
+  end
+
   defp route("GET", "/api/state", _body, _web_dir) do
     {"200 OK", "application/json; charset=utf-8", JSON.encode!(GameServer.get_payload())}
   end
@@ -141,15 +278,41 @@ defmodule ThreeChess.HttpServer do
     {"200 OK", "application/json; charset=utf-8", JSON.encode!(GameServer.load_demo())}
   end
 
+  defp route("POST", "/api/seat", body, _web_dir) do
+    case JSON.decode(body) do
+      {:ok, %{"action" => "claim", "player" => player, "client_id" => client_id} = params}
+      when is_integer(player) and is_binary(client_id) ->
+        res = GameServer.claim_seat(player, client_id, Map.get(params, "name"))
+        {"200 OK", "application/json; charset=utf-8", JSON.encode!(res)}
+
+      {:ok, %{"action" => "release", "player" => player} = params} when is_integer(player) ->
+        client_id = Map.get(params, "client_id")
+        force = Map.get(params, "force", false) == true
+        res = GameServer.release_seat(player, client_id, force)
+        {"200 OK", "application/json; charset=utf-8", JSON.encode!(res)}
+
+      {:ok, %{"action" => "controller", "player" => player, "controller" => controller}}
+      when is_integer(player) and is_binary(controller) ->
+        res = GameServer.set_controller(player, controller)
+        {"200 OK", "application/json; charset=utf-8", JSON.encode!(res)}
+
+      _ ->
+        {"400 Bad Request", "application/json; charset=utf-8",
+         JSON.encode!(%{ok: false, error: "Invalid seat request payload"})}
+    end
+  end
+
   defp route("POST", "/api/move", body, _web_dir) do
     case JSON.decode(body) do
       {:ok, %{"from" => from, "to" => to} = params} when is_integer(from) and is_integer(to) ->
         promo = Map.get(params, "promo", 0)
-        res = GameServer.make_move(from, to, promo)
+        client_id = Map.get(params, "client_id")
+        res = GameServer.make_move(from, to, promo, client_id)
         {"200 OK", "application/json; charset=utf-8", JSON.encode!(res)}
 
       _ ->
-        {"400 Bad Request", "application/json; charset=utf-8", JSON.encode!(%{ok: false, error: "Invalid move payload"})}
+        {"400 Bad Request", "application/json; charset=utf-8",
+         JSON.encode!(%{ok: false, error: "Invalid move payload"})}
     end
   end
 
@@ -172,7 +335,13 @@ defmodule ThreeChess.HttpServer do
         _ -> 2
       end
 
-    res = GameServer.ai_move(strategy, depth)
+    expected_ply =
+      case Map.get(params, "expected_ply") do
+        p when is_integer(p) -> p
+        _ -> nil
+      end
+
+    res = GameServer.ai_move(strategy, depth, expected_ply)
     {"200 OK", "application/json; charset=utf-8", JSON.encode!(res)}
   end
 
@@ -216,6 +385,9 @@ defmodule ThreeChess.HttpServer do
       "HTTP/1.1 #{status}\r\n" <>
         "Content-Type: #{content_type}\r\n" <>
         "Content-Length: #{byte_size(body)}\r\n" <>
+        "Access-Control-Allow-Origin: *\r\n" <>
+        "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n" <>
+        "Access-Control-Allow-Headers: Content-Type\r\n" <>
         "Cache-Control: no-store\r\n" <>
         "Connection: close\r\n\r\n"
 
